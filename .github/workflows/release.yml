@@ -1,0 +1,74 @@
+name: Release
+
+# Builds the Windows VST3 when a release is published and attaches it to that
+# release. A manual run builds the same archive and keeps it as a workflow artifact.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build Windows VST3
+    runs-on: windows-latest
+    permissions:
+      contents: write # needed only to attach the files to the release
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v7
+
+      - name: Resolve the tag and the version
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $tag = if ($env:GITHUB_EVENT_NAME -eq 'release') { $env:RELEASE_TAG } else { 'manual-' + $env:GITHUB_SHA.Substring(0, 7) }
+          $version = if ($tag -match '^v?(\d+\.\d+\.\d+)') { $Matches[1] } else { '0.0.0' }
+          "TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Tag: $tag, plugin version: $version"
+          cmake --version
+
+      - name: Configure
+        shell: pwsh
+        run: cmake -S . -B build -A x64 -DDEESSR_COPY_AFTER_BUILD=OFF -DDEESSR_BUILD_TOOLS=OFF "-DDEESSR_VERSION=$env:VERSION"
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        shell: pwsh
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $bundle = 'build/DeEssr_artefacts/Release/VST3/de-essr.vst3'
+          if (-not (Test-Path "$bundle/Contents/x86_64-win/de-essr.vst3")) { throw "VST3 bundle not found at $bundle" }
+          $zip = "de-essr-$env:TAG-windows-vst3.zip"
+          Compress-Archive -Path $bundle -DestinationPath $zip
+          $hash = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Out-File -FilePath "$zip.sha256" -Encoding ascii
+          "ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Get-Content "$zip.sha256"
+
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$env:TAG" "$env:ZIP" "$env:ZIP.sha256" --clobber
+
+      - name: Keep as a workflow artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: de-essr-windows-vst3
+          path: |
+            ${{ env.ZIP }}
+            ${{ env.ZIP }}.sha256
+          if-no-files-found: error

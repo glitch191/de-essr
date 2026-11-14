@@ -1,0 +1,28 @@
+# Build output and downloaded dependencies
+/build/
+/build-*/
+/out/
+/dist/
+_deps/
+CMakeUserPresets.json
+
+# Compiled plugin and release archives (never versioned)
+*.vst3
+*.zip
+*.sha256
+
+# Verification screenshots (only docs/screenshots is versioned)
+/tmp-screenshots/
+
+# Logs
+*.log
+
+# Editor and OS files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+Thumbs.db
+desktop.ini
+.DS_Store
