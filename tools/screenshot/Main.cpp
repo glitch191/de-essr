@@ -5,9 +5,10 @@
 // then saves a snapshot of the editor component. Nothing else is captured:
 // no desktop, no window frame, no personal data.
 //
-// Usage: de-essr-screenshot <output.png> [uiScale] [pixelScale] [logicalWidth logicalHeight]
+// Usage: de-essr-screenshot <output.png> [uiScale] [pixelScale] [logicalWidth logicalHeight] [presetIndex]
 
 #include "TestSignals.h"
+#include "dsp/FactoryPresets.h"
 #include "plugin/PluginProcessor.h"
 #include "ui/PluginEditor.h"
 
@@ -20,7 +21,7 @@ int main (int argc, char* argv[])
 {
     if (argc < 2)
     {
-        std::printf ("Usage: de-essr-screenshot <output.png> [uiScale] [pixelScale] [logicalWidth logicalHeight]\n");
+        std::printf ("Usage: de-essr-screenshot <output.png> [uiScale] [pixelScale] [logicalWidth logicalHeight] [presetIndex]\n");
         return 2;
     }
 
@@ -38,6 +39,25 @@ int main (int argc, char* argv[])
 
     if (argc > 5)
         processor.setUiSize (juce::String (argv[4]).getIntValue(), juce::String (argv[5]).getIntValue());
+
+    // Round trip of every factory preset through the real parameters.
+    {
+        const auto presets = deessr::factoryPresets();
+        int recognised = 0;
+
+        for (size_t i = 0; i < presets.size(); ++i)
+        {
+            applyFactoryPreset (processor.apvts, presets[i]);
+            recognised += findMatchingFactoryPreset (processor.apvts) == (int) i ? 1 : 0;
+        }
+
+        std::printf ("Presets applied and recognised: %d of %d\n", recognised, (int) presets.size());
+        const int chosen = argc > 6 ? juce::String (argv[6]).getIntValue() : 0;
+        applyFactoryPreset (processor.apvts, presets[(size_t) juce::jlimit (0, (int) presets.size() - 1, chosen)]);
+
+        if (recognised != (int) presets.size())
+            return 1;
+    }
 
     processor.setPlayConfigDetails (2, 2, sampleRate, blockSize);
     processor.prepareToPlay (sampleRate, blockSize);

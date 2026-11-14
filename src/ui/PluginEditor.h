@@ -44,6 +44,7 @@ private:
         SegmentedControl mode;
         ParamToggle listen;
         ParamToggle bypass;
+        MenuButton presetButton;
         MenuButton scaleButton;
         SpectrumView spectrum;
         HistoryView history;
@@ -58,6 +59,7 @@ private:
 
     void applyScale();
     void showScaleMenu();
+    void showPresetMenu();
     void onVerticalBlank();
     void updateDiagnostics();
 

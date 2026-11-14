@@ -42,3 +42,14 @@ private:
     std::atomic<float>* listen = nullptr;
     std::atomic<float>* bypass = nullptr;
 };
+
+// --- factory presets ---------------------------------------------------------
+
+namespace deessr { struct FactoryPreset; }
+
+/** Applies a factory preset, notifying the host of each change. Message thread only.
+    Listen and Bypass are left as they are. */
+void applyFactoryPreset (juce::AudioProcessorValueTreeState& state, const deessr::FactoryPreset& preset);
+
+/** Index of the factory preset matching the current settings, or -1 if none does. */
+int findMatchingFactoryPreset (const juce::AudioProcessorValueTreeState& state);

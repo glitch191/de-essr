@@ -1,5 +1,10 @@
 #include "plugin/Parameters.h"
 
+#include "dsp/FactoryPresets.h"
+
+#include <array>
+#include <cmath>
+
 namespace
 {
     using Attributes = juce::AudioParameterFloatAttributes;
@@ -113,4 +118,66 @@ deessr::Params ParameterReader::read() const noexcept
     p.listen = get (listen) > 0.5f;
     p.bypass = get (bypass) > 0.5f;
     return p;
+}
+
+// --- factory presets ---------------------------------------------------------
+
+namespace
+{
+    struct PresetValue
+    {
+        const char* id;
+        float value;      // in the units of the parameter
+        float tolerance;  // used to recognise the preset from the current settings
+    };
+
+    std::array<PresetValue, 9> presetValues (const deessr::Params& p)
+    {
+        return { {
+            { ids::mode, p.mode == deessr::Mode::bus ? 1.0f : 0.0f, 0.1f },
+            { ids::amount, p.amount * 100.0f, 0.5f },
+            { ids::range, p.rangeDb, 0.05f },
+            { ids::focus, p.focus * 100.0f, 0.5f },
+            { ids::bandLow, p.bandLowHz, 10.0f },
+            { ids::bandHigh, p.bandHighHz, 10.0f },
+            { ids::release, p.releaseMs, 0.5f },
+            { ids::stereoLink, p.stereoLink * 100.0f, 0.5f },
+            { ids::outputGain, p.outputGainDb, 0.05f },
+        } };
+    }
+}
+
+void applyFactoryPreset (juce::AudioProcessorValueTreeState& state, const deessr::FactoryPreset& preset)
+{
+    for (const auto& item : presetValues (preset.params))
+    {
+        if (auto* parameter = state.getParameter (item.id))
+        {
+            parameter->beginChangeGesture();
+            parameter->setValueNotifyingHost (parameter->convertTo0to1 (item.value));
+            parameter->endChangeGesture();
+        }
+    }
+}
+
+int findMatchingFactoryPreset (const juce::AudioProcessorValueTreeState& state)
+{
+    const auto presets = deessr::factoryPresets();
+
+    for (size_t index = 0; index < presets.size(); ++index)
+    {
+        bool matches = true;
+
+        for (const auto& item : presetValues (presets[index].params))
+        {
+            const auto* current = state.getRawParameterValue (item.id);
+            matches = matches && current != nullptr
+                      && std::abs (current->load (std::memory_order_relaxed) - item.value) <= item.tolerance;
+        }
+
+        if (matches)
+            return (int) index;
+    }
+
+    return -1;
 }

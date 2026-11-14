@@ -32,6 +32,8 @@ add_library(deessr_dsp STATIC
     src/dsp/DeEsserEngine.cpp
     src/dsp/DeEsserEngine.h
     src/dsp/DspMath.h
+    src/dsp/FactoryPresets.cpp
+    src/dsp/FactoryPresets.h
     src/dsp/Fft.cpp
     src/dsp/Fft.h
     src/dsp/Params.h
@@ -144,6 +146,7 @@ if(DEESSR_BUILD_TESTS)
         tests/EngineBasicsTests.cpp
         tests/DetectionTests.cpp
         tests/FftTests.cpp
+        tests/PresetTests.cpp
         tests/RobustnessTests.cpp)
     target_link_libraries(DeEssrTests PRIVATE deessr_dsp Catch2::Catch2WithMain)
     if(MSVC)

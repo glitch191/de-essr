@@ -1,5 +1,7 @@
 #include "ui/PluginEditor.h"
 
+#include "dsp/FactoryPresets.h"
+
 #include <algorithm>
 
 namespace
@@ -18,6 +20,7 @@ DeEssrAudioProcessorEditor::Content::Content (DeEssrAudioProcessor& p)
             "Bus: a group or a full mix, reacts to what stands out from the average."),
       listen (p.apvts, ids::listen, "Listen to what is being removed instead of the processed signal."),
       bypass (p.apvts, ids::bypass, "Bypass the processing. The signal stays aligned with the reported latency."),
+      presetButton ("Factory presets: starting points for common sources. Listen and Bypass are not changed."),
       scaleButton ("Interface scale and display diagnostics."),
       spectrum (p.apvts),
       tooltips (this, 700)
@@ -46,6 +49,7 @@ DeEssrAudioProcessorEditor::Content::Content (DeEssrAudioProcessor& p)
     addAndMakeVisible (mode);
     addAndMakeVisible (listen);
     addAndMakeVisible (bypass);
+    addAndMakeVisible (presetButton);
     addAndMakeVisible (scaleButton);
     addAndMakeVisible (spectrum);
     addAndMakeVisible (history);
@@ -77,6 +81,8 @@ void DeEssrAudioProcessorEditor::Content::resized()
     listen.setBounds (top.removeFromRight (84));
     top.removeFromRight (2 * theme::gap);
     mode.setBounds (top.removeFromRight (152));
+    top.removeFromRight (2 * theme::gap);
+    presetButton.setBounds (top.removeFromRight (96));
     top.removeFromRight (theme::gap);
     titleArea = top;
 
@@ -119,6 +125,8 @@ DeEssrAudioProcessorEditor::DeEssrAudioProcessorEditor (DeEssrAudioProcessor& p)
     addAndMakeVisible (content);
 
     content.scaleButton.onClick = [this] { showScaleMenu(); };
+    content.presetButton.onClick = [this] { showPresetMenu(); };
+    content.presetButton.setText ("Presets");
 
     // Scale and size come from the plugin state and are applied before the first paint.
     scale = deEsser.getUiScale();
@@ -283,4 +291,45 @@ void DeEssrAudioProcessorEditor::updateDiagnostics()
                                      + "  |  frame time avg " + juce::String (average * 1000.0, 2) + " ms"
                                      + "  |  worst 1% " + juce::String (worst * 1000.0, 2) + " ms",
                                  juce::dontSendNotification);
+}
+
+void DeEssrAudioProcessorEditor::showPresetMenu()
+{
+    const auto presets = deessr::factoryPresets();
+    const int current = findMatchingFactoryPreset (deEsser.apvts);
+
+    juce::PopupMenu menu;
+    menu.setLookAndFeel (&lookAndFeel);
+
+    // One submenu per category; the preset matching the current settings is ticked.
+    for (size_t first = 0; first < presets.size();)
+    {
+        const juce::String category (presets[first].category);
+        juce::PopupMenu submenu;
+        submenu.setLookAndFeel (&lookAndFeel);
+        bool containsCurrent = false;
+        size_t index = first;
+
+        for (; index < presets.size() && category == presets[index].category; ++index)
+        {
+            const bool isCurrent = (int) index == current;
+            containsCurrent = containsCurrent || isCurrent;
+            submenu.addItem ((int) index + 1, presets[index].name, true, isCurrent);
+        }
+
+        menu.addSubMenu (category, submenu, true, nullptr, containsCurrent);
+        first = index;
+    }
+
+    menu.showMenuAsync (juce::PopupMenu::Options()
+                            .withTargetComponent (content.presetButton)
+                            .withParentComponent (&content)
+                            .withMinimumWidth (180),
+                        [safe = juce::Component::SafePointer<DeEssrAudioProcessorEditor> (this)] (int result)
+                        {
+                            const auto all = deessr::factoryPresets();
+
+                            if (safe != nullptr && result > 0 && (size_t) result <= all.size())
+                                applyFactoryPreset (safe->deEsser.apvts, all[(size_t) result - 1]);
+                        });
 }
