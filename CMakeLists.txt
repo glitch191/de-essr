@@ -60,7 +60,7 @@ FetchContent_MakeAvailable(JUCE)
 
 juce_add_plugin(DeEssr
     PRODUCT_NAME "de-essr"
-    COMPANY_NAME "de-essr"
+    COMPANY_NAME "glitch191"
     BUNDLE_ID "com.de-essr.de-essr"
     PLUGIN_MANUFACTURER_CODE Dssr
     PLUGIN_CODE Des1
